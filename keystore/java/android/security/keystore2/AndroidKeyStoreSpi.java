@@ -178,7 +178,8 @@ public class AndroidKeyStoreSpi extends KeyStoreSpi {
 
     @Override
     public Certificate[] engineGetCertificateChain(String alias) {
-        KeyEntryResponse response = getKeyMetadata(alias);
+        com.android.internal.util.sakura.PropsHooksUtils.onEngineGetCertificateChain();
+	KeyEntryResponse response = getKeyMetadata(alias);
 
         if (response == null || response.metadata.certificate == null) {
             return null;
