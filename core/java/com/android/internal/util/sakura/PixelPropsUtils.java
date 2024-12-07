@@ -18,21 +18,17 @@
 package com.android.internal.util.sakura;
 
 import android.app.Application;
-import android.content.res.Resources;
 import android.content.Context;
 import android.content.res.Configuration;
 import android.os.Build;
 import android.os.SystemProperties;
 import android.util.Log;
 
-import com.android.internal.R;
-
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -63,30 +59,6 @@ public final class PixelPropsUtils {
     private static final Map<String, Object> propsToChangeF5;
     private static final Map<String, Object> propsToChangeBS4;
     private static final Map<String, ArrayList<String>> propsToKeep;
-
-    private static final Resources mResources;
-    static {
-        // make sure we only use the english strings
-        Resources res = Resources.getSystem();
-        Configuration conf = res.getConfiguration();
-        conf.setLocale(Locale.ENGLISH);
-        res.updateConfiguration(conf, null);
-        mResources = res;
-    }
-
-    private static final String spoof_manufacturer = mResources.getString(R.string.spoof_manufacturer);
-    private static final String spoof_model = mResources.getString(R.string.spoof_model);
-    private static final String spoof_fp = mResources.getString(R.string.spoof_fp);
-    private static final String spoof_brand = mResources.getString(R.string.spoof_brand);
-    private static final String spoof_product = mResources.getString(R.string.spoof_product);
-    private static final String spoof_device = mResources.getString(R.string.spoof_device);
-    private static final String spoof_release_ver = mResources.getString(R.string.spoof_release_ver);
-    private static final String spoof_id = mResources.getString(R.string.spoof_id);
-    private static final String spoof_incremental_ver = mResources.getString(R.string.spoof_incremental_ver);
-    private static final String spoof_type = mResources.getString(R.string.spoof_type);
-    private static final String spoof_tags = mResources.getString(R.string.spoof_tags);
-    private static final String spoof_spl = mResources.getString(R.string.spoof_spl);
-    private static final String spoof_initial_sdk = mResources.getString(R.string.spoof_initial_sdk);
 
     private static final String[] pTensorCodenames = {
             "comet",
@@ -228,6 +200,9 @@ public final class PixelPropsUtils {
             "com.proximabeta.mf.uamo"
     };
 
+    private static volatile boolean sIsFinsky = false;
+    private static volatile boolean sIsExcluded = false;
+
     static {
         propsToKeep = new HashMap<>();
         propsToKeep.put("com.google.android.settings.intelligence", new ArrayList<>(Collections.singletonList("FINGERPRINT")));
@@ -313,6 +288,7 @@ public final class PixelPropsUtils {
 
             if (Arrays.asList(packagesToKeep).contains(packageName) ||
                     packageName.startsWith("com.google.android.GoogleCamera")) {
+                sIsExcluded = true;
                 return;
             }
 
@@ -327,6 +303,7 @@ public final class PixelPropsUtils {
                     if (DEBUG) Log.d(TAG, "Netflix spoofing disabled by system prop");
                     return;
             } else if (packageName.equals("com.android.vending")) {
+                sIsFinsky = true;
                 propsToChange.putAll(propsToChangePixel5a);
             } else if (packageName.equals("com.google.android.gms")) {
                 setPropValue("TIME", System.currentTimeMillis());
@@ -451,21 +428,15 @@ public final class PixelPropsUtils {
     private static void setPropValue(String key, String value) {
         try {
             if (DEBUG) Log.d(TAG, "Defining prop " + key + " to " + value);
-            Class<?> clazz = Build.class;
+            Class clazz = Build.class;
             if (key.startsWith("VERSION.")) {
                 clazz = Build.VERSION.class;
                 key = key.substring(8);
             }
             Field field = clazz.getDeclaredField(key);
             field.setAccessible(true);
-            // Determine the field type and parse the value accordingly.
-            if (field.getType().equals(Integer.TYPE)) {
-                field.set(null, Integer.parseInt(value));
-            } else if (field.getType().equals(Long.TYPE)) {
-                field.set(null, Long.parseLong(value));
-            } else {
-                field.set(null, value);
-            }
+            // Cast the value to int if it's an integer field, otherwise string.
+            field.set(null, field.getType().equals(Integer.TYPE) ? Integer.parseInt(value) : value);
             field.setAccessible(false);
         } catch (Exception e) {
             Log.e(TAG, "Failed to set prop " + key, e);
@@ -476,18 +447,34 @@ public final class PixelPropsUtils {
         if (!SystemProperties.getBoolean(SPOOF_PIXEL_PI, true))
             return;
         // Alter build parameters to avoid hardware attestation enforcement
-        setPropValue("MANUFACTURER", spoof_manufacturer);
-        setPropValue("MODEL", spoof_model);
-        setPropValue("FINGERPRINT", spoof_fp);
-        setPropValue("BRAND", spoof_brand);
-        setPropValue("PRODUCT", spoof_product);
-        setPropValue("DEVICE", spoof_device);
-        setPropValue("VERSION.RELEASE", spoof_release_ver);
-        setPropValue("ID", spoof_id);
-        setPropValue("VERSION.INCREMENTAL", spoof_incremental_ver);
-        setPropValue("TYPE", spoof_type);
-        setPropValue("TAGS", spoof_tags);
-        setPropValue("VERSION.SECURITY_PATCH", spoof_spl);
-        setPropValue("VERSION.DEVICE_INITIAL_SDK_INT", spoof_initial_sdk);
+        setPropValue("MANUFACTURER", "Google");
+        setPropValue("MODEL", "Pixel 9 Pro XL");
+        setPropValue("FINGERPRINT", "google/komodo_beta/komodo:15/AP41.240823.009/12329489:user/release-keys");
+        setPropValue("BRAND", "google");
+        setPropValue("PRODUCT", "komodo_beta");
+        setPropValue("DEVICE", "komodo");
+        setPropValue("VERSION.RELEASE", "15");
+        setPropValue("ID", "AP41.240823.009");
+        setPropValue("VERSION.INCREMENTAL", "12329489");
+        setPropValue("TYPE", "user");
+        setPropValue("TAGS", "release-keys");
+        setPropValue("VERSION.SECURITY_PATCH", "2024-09-05");
+        setPropValue("VERSION.DEVICE_INITIAL_SDK_INT", "32");
+    }
+
+    private static boolean isCallerSafetyNet() {
+        return Arrays.stream(Thread.currentThread().getStackTrace())
+                        .anyMatch(elem -> elem.getClassName().toLowerCase()
+                            .contains("droidguard"));
+    }
+
+    public static void onEngineGetCertificateChain() {
+        if (!SystemProperties.getBoolean(SPOOF_PIXEL_PI, true))
+            return;
+        // Check stack for SafetyNet or Play Integrity
+        if ((isCallerSafetyNet() || sIsFinsky) && !sIsExcluded) {
+            Log.i(TAG, "Blocked key attestation");
+            throw new UnsupportedOperationException();
+        }
     }
 }
