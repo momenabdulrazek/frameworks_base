@@ -143,7 +143,9 @@ public final class PixelPropsUtils {
                 propsToChange.putAll(propsToChangePixelXL);
             } else {
                 if (!isPixelDevice) {
-                    propsToChange.putAll(propsToChangePixel5a);
+                if (processName.toLowerCase().contains("gservice")){
+                        propsToChange.putAll(propsToChangePixel5a);
+                    }
                 }
             }
         }
