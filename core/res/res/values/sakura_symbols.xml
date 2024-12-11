@@ -59,17 +59,6 @@
 
     <!-- Whether to force enable multi resolution configuration for camera -->
     <java-symbol type="bool" name="config_forceMultiResolution" />
-
-    <!-- PixelPropUtils -->
-    <java-symbol type="string" name="spoof_brand" />
-    <java-symbol type="string" name="spoof_manufacturer" />
-    <java-symbol type="string" name="spoof_device" />
-    <java-symbol type="string" name="spoof_id" />
-    <java-symbol type="string" name="spoof_fp" />
-    <java-symbol type="string" name="spoof_model" />
-    <java-symbol type="string" name="spoof_product" />
-    <java-symbol type="string" name="spoof_spl" />
-
     <!-- Default line spacing multiplier between hours and minutes of the keyguard clock-->
     <java-symbol type="dimen" format="float" name="keyguard_clock_line_spacing_scale" />
 
